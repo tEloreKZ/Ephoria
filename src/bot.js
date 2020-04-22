@@ -1,43 +1,55 @@
 require('dotenv').config();
 const { Client } = require('discord.js');
 const client = new Client();
-let connections;
+const StateManager = require('../src/utils/StateManager');
 
-const guildCommandPrefixes = new Map();
+const { registerCommands, registerEvents } = require('./utils/register');
 
-client.on('ready', () => {
-    console.log(`${client.user.tag} авторизовалась.`);
-    client.guilds.cache.forEach(guild => {
-        connections.query(
-            `SELECT cmdPrefix FROM GuildConfigurable WHERE guildId = '${guild.id}'`
-        ).then(result => {
-            guildCommandPrefixes.set(guild.id, result[0][0].cmdPrefix);
-        }).catch(err => console.log(err));
-    });
+
+var Discord = require('discord.js');
+var bot = new Discord.Client();
+
+const newUsers = [];
+
+
+
+client.on("guildMemberAdd", (member) => {
+    this.connection = StateManager.connection;
+    const guild = member.guild;
+    if (!newUsers[guild.id]) newUsers[guild.id] = new Discord.Collection();
+    newUsers[guild.id].set(member.id, member.user);
+    this.connection.query ( 
+      `INSERT INTO users (name, discorid, banned, kick) VALUES ('${member.user.tag}', '${member.user.id}', 'НЕТ', 'НЕТ')`, function (error, rows, results, fields) {
+      }
+    ); 
+    member.send(
+        `
+        Приветсвую в нашем Дискорде!
+        `
+    );
+    newUsers[guild.id].clear();
+  });
+
+client.on("guildMemberRemove", async member => {
+    this.connection = StateManager.connection;
+    this.connection.query (
+        `DELETE FROM users WHERE discorid = '${member.user.id}'`, function (error, rows, results, fields) {
+        }
+    );
 });
 
-client.on('guildCreate', async (guild) => {
-    try {
-        await connections.query(
-            `INSERT INTO Guilds VALUES('${guild.id}', '${guild.ownerID}')`
-        );
-        await connections.query(
-            `INSERT INTO GuildConfigurable (guildId) VALUES ('${guild.id}')`
-        );
-    } catch(err) {
-        console.log(err);
-    }
-});
 
-client.on('message', async (message) => {
-    if (message.author.bot) return;
-    const prefix = guildCommandPrefixes.get(message.guild.id);
-    if (message.content.toLowerCase().startsWith(prefix + 'help')) {
-        message.channel.send(`Тестовая команда из БД: ${prefix}`);
-    }
-});
+
 
 (async () => {
-    connections = await require('../database/dbconnect');
     await client.login(process.env.BOT_TOKEN);
+    client.commands = new Map();
+    await registerCommands(client, '../commands');
+    await registerEvents(client, '../events');
 })();
+
+
+
+
+
+
